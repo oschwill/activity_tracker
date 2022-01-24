@@ -2,8 +2,17 @@
 import Workout from './Workout';
 
 export default class Running extends Workout {
+  /* private properties */
+  #pace;
   /* public properties */
   cadence;
+  type = 'running';
+
+  /* GETTER */
+  get getPace() {
+    this.#pace = this.duration / this.distance; // Tempo ausrechnen
+    return this.#pace;
+  }
 
   /* KONSTRUKTOR */
   constructor(coords, distance, duration, cadence) {
@@ -11,12 +20,6 @@ export default class Running extends Workout {
     super(coords, distance, duration);
     // Wert setzten
     this.cadence = cadence;
-    // Tempo berechnen
-    this.calcPace();
-  }
-
-  calcPace() {
-    this.pace = this.duration / this.distance; // Tempo ausrechnen
-    return this.pace;
+    this._setDescription();
   }
 }
