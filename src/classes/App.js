@@ -5,8 +5,10 @@ import Running from './Running';
 export default class App {
   /* private properties */
   #map;
+  #mapZoomLevel = 13;
   #mapEvent;
   #workouts = [];
+  #preWorkout;
   /* public properties */
   sidebar;
   form;
@@ -21,12 +23,19 @@ export default class App {
   constructor() {
     // Alle Dom Elemente definieren
     this._defineElements();
+    // Wir resetten die select option
+    this.inputType.selectedIndex = 0;
     // Map Laden und Position ermitteln
     this._getPosition();
+
+    // Daten aus dem Local Storage laden und bereits vorhandene Marker setzten
+    this._getLocalStorage();
     // Event Listener für die Form erzeugen und this keyword an app binden
     this.form.addEventListener('submit', this._newWorkout.bind(this));
     // Eventlistener für den type change erzeugen
     this.inputType.addEventListener('change', this._changeType.bind(this));
+    // Eventlistener um zu dem marker zu moven bei klicken auf das erstellte Event
+    this.containerWorkouts.addEventListener('click', this._moveToPopup.bind(this));
   }
 
   /* METHODS */
@@ -52,7 +61,7 @@ export default class App {
   _loadMap(position) {
     const { latitude, longitude } = position.coords;
 
-    this.#map = L.map('map').setView([latitude, longitude], 13);
+    this.#map = L.map('map').setView([latitude, longitude], this.#mapZoomLevel);
 
     L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
       attribution:
@@ -61,6 +70,11 @@ export default class App {
 
     // Klick auf die Map
     this.#map.on('click', this._showForm.bind(this));
+
+    // Wir laden die marker aus dem localstorage
+    this.#workouts.forEach((work) => {
+      this._renderWorkoutMarker(work);
+    });
   }
 
   _showForm(mapE) {
@@ -109,8 +123,10 @@ export default class App {
         )
           return alert('RUNNING: Bitte geben Sie nur positive Zahlen ein!');
 
+        // Das Popup für den marker erstellen und an das Object binden
+        let popup = this._createPopup(type);
         // Neues Running Workout Object erstellen
-        workout = new Running([lat, lng], distance, duration, cadence);
+        workout = new Running([lat, lng], distance, duration, popup, cadence);
         break;
       case 'cycling':
         const elevation = +this.inputElevation.value; // Number
@@ -118,8 +134,10 @@ export default class App {
         if (!validPositiveInputs(distance, duration, elevation) || !allPositive(distance, duration))
           return alert('Bitte geben Sie nur positive Zahlen ein!');
 
+        // Das Popup für den marker erstellen und an das Object binden
+        popup = this._createPopup(type);
         // Neues Cycling Workout Object erstellen
-        workout = new Cycling([lat, lng], distance, duration, elevation);
+        workout = new Cycling([lat, lng], distance, duration, popup, elevation);
         break;
 
       default:
@@ -137,20 +155,25 @@ export default class App {
     this._renderWorkout(workout);
     // Input Felder clearen und From hiden
     this._hideForm();
+
+    // Local Storage einrichten
+    this._setLocalStorage();
+  }
+
+  _createPopup(type) {
+    return L.popup({
+      maxWidth: 250,
+      minWidth: 100,
+      autoClose: false,
+      closeOnClick: false,
+      className: `${type}-popup`,
+    });
   }
 
   _renderWorkoutMarker(workout) {
     L.marker(workout.coords)
       .addTo(this.#map)
-      .bindPopup(
-        L.popup({
-          maxWidth: 250,
-          minWidth: 100,
-          autoClose: false,
-          closeOnClick: false,
-          className: `${workout.type}-popup`,
-        })
-      )
+      .bindPopup(workout.popup)
       .setPopupContent(`${workout.type === 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${workout.description}`)
       .openPopup();
   }
@@ -205,5 +228,76 @@ export default class App {
   _changeType() {
     this.inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
     this.inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
+  }
+
+  _moveToPopup(e) {
+    // Falls bereits auf ein Workput geklcikt wurde, resetten wir das Popup
+    if (this.#preWorkout) this.#preWorkout.popup._container.firstChild.style.transform = 'scale(1)';
+
+    const workoutEl = e.target.closest('.workout');
+
+    if (!workoutEl) return;
+
+    const workout = this.#workouts.find((work) => work.getId === workoutEl.dataset.id);
+
+    // Bei Klick auf das Workout popup vergrößern
+    workout.popup._container.firstChild.style.transform = 'scale(1.15)';
+
+    // Workout object via reference an private property binden
+    this.#preWorkout = workout;
+
+    // Wir setzen die view auf die koordinaten des geklickten Workputs
+    this.#map.setView(workout.coords, this.#mapZoomLevel, {
+      animate: true,
+      pan: {
+        duration: 1,
+      },
+    });
+
+    // Wir zählen die Klicks
+    workout._click();
+  }
+
+  _setLocalStorage() {
+    localStorage.setItem('workouts', JSON.stringify(this.#workouts, this.getCircularReplacer()));
+  }
+
+  getCircularReplacer = () => {
+    const seen = new WeakSet();
+    return (key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          return;
+        }
+        seen.add(value);
+      }
+      return value;
+    };
+  };
+
+  _getLocalStorage() {
+    const data = JSON.parse(localStorage.getItem('workouts'));
+
+    if (!data) return;
+
+    this.#workouts = data.map((obj) => {
+      let popup = this._createPopup(obj.type);
+
+      if (obj.type == 'running') {
+        return new Running(obj.coords, obj.distance, obj.duration, popup, obj.cadence);
+      }
+      if (obj.type == 'cycling') {
+        return new Cycling(obj.coords, obj.distance, obj.duration, popup, obj.elevationGain);
+      }
+    });
+
+    this.#workouts.forEach((work) => {
+      this._renderWorkout(work);
+    });
+  }
+
+  _resetLocalStorage() {
+    localStorage.removeItem('workouts');
+    location.reload();
   }
 }

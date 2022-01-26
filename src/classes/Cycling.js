@@ -16,8 +16,8 @@ export default class Cycling extends Workout {
   }
 
   /* KONSTRUKTOR */
-  constructor(coords, distance, duration, elevationGain) {
-    super(coords, distance, duration); // Parent Kontruktor aufrufen
+  constructor(coords, distance, duration, popup, elevationGain) {
+    super(coords, distance, duration, popup); // Parent Kontruktor aufrufen
     this.elevationGain = elevationGain;
     // Geschwindigkeit in Stunden ausrechnen
     this._setDescription();

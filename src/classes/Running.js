@@ -15,9 +15,9 @@ export default class Running extends Workout {
   }
 
   /* KONSTRUKTOR */
-  constructor(coords, distance, duration, cadence) {
+  constructor(coords, distance, duration, popup, cadence) {
     // Parent Kontruktor aufrufen
-    super(coords, distance, duration);
+    super(coords, distance, duration, popup);
     // Wert setzten
     this.cadence = cadence;
     this._setDescription();
