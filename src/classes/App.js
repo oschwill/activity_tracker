@@ -1,6 +1,11 @@
+/* API */
+import L from 'leaflet';
 /* CLASSES */
 import Cycling from './Cycling';
 import Running from './Running';
+import AlertBox from './AlertBox';
+// images
+import logo from '../images/logo.png';
 
 export default class App {
   /* private properties */
@@ -27,6 +32,8 @@ export default class App {
     this.inputType.selectedIndex = 0;
     // Map Laden und Position ermitteln
     this._getPosition();
+    // Bilder laden
+    this.sidebar.insertAdjacentHTML('afterbegin', `<img src="${logo}" alt="Logo" class="logo" />`);
 
     // Daten aus dem Local Storage laden und bereits vorhandene Marker setzten
     this._getLocalStorage();
@@ -36,6 +43,8 @@ export default class App {
     this.inputType.addEventListener('change', this._changeType.bind(this));
     // Eventlistener um zu dem marker zu moven bei klicken auf das erstellte Event
     this.containerWorkouts.addEventListener('click', this._moveToPopup.bind(this));
+    // Eventlistener um alle workouts zu löschen!
+    this.button.addEventListener('click', this._resetLocalStorage);
   }
 
   /* METHODS */
@@ -48,12 +57,21 @@ export default class App {
     this.inputDuration = document.querySelector('.form__input--duration');
     this.inputCadence = document.querySelector('.form__input--cadence');
     this.inputElevation = document.querySelector('.form__input--elevation');
+    this.button = document.querySelector('.delete__button');
   }
 
   _getPosition() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(this._loadMap.bind(this), function () {
-        alert('Konnte die Position nicht lokalisieren');
+        AlertBox.createBox({
+          type: 'error',
+          position: 'top',
+          animation: 'zoom',
+          animDuration: 500,
+          text: 'Konnte die Position nicht lokalisieren',
+          vanish: true,
+          vanishTimer: 10,
+        });
       });
     }
   }
@@ -75,6 +93,16 @@ export default class App {
     this.#workouts.forEach((work) => {
       this._renderWorkoutMarker(work);
     });
+    // Nach Laden der Seite checlen ob elemente existieren dann delete Button laden
+    if (this.#workouts.length > 0) {
+      this._setDeleteButton();
+    }
+  }
+
+  _setDeleteButton() {
+    if (this.#workouts.length > 0) {
+      this.button.classList.toggle('delete__button--hidden');
+    }
   }
 
   _showForm(mapE) {
@@ -95,8 +123,6 @@ export default class App {
     this.form.classList.add('hidden');
     setTimeout(() => (this.form.style.display = 'grid')), 1000;
   }
-
-  _toggleElevationField() {}
 
   _newWorkout(e) {
     /* Helper functions */
@@ -121,7 +147,15 @@ export default class App {
           !validPositiveInputs(distance, duration, cadence) ||
           !allPositive(distance, duration, cadence)
         )
-          return alert('RUNNING: Bitte geben Sie nur positive Zahlen ein!');
+          return AlertBox.createBox({
+            type: 'error',
+            position: 'top',
+            animation: 'slideIn',
+            animDuration: 500,
+            text: 'Bitte geben Sie nur positive Zahlen ein!',
+            vanish: true,
+            vanishTimer: 7,
+          });
 
         // Das Popup für den marker erstellen und an das Object binden
         let popup = this._createPopup(type);
@@ -132,7 +166,15 @@ export default class App {
         const elevation = +this.inputElevation.value; // Number
         // Checken ob distance, duration, eine endliche Number ist und größer 0
         if (!validPositiveInputs(distance, duration, elevation) || !allPositive(distance, duration))
-          return alert('Bitte geben Sie nur positive Zahlen ein!');
+          return AlertBox.createBox({
+            type: 'error',
+            position: 'top',
+            animation: 'slideIn',
+            animDuration: 500,
+            text: 'Bitte geben Sie nur positive Zahlen ein!',
+            vanish: true,
+            vanishTimer: 7,
+          });
 
         // Das Popup für den marker erstellen und an das Object binden
         popup = this._createPopup(type);
@@ -141,7 +183,15 @@ export default class App {
         break;
 
       default:
-        alert('Fehler bei der Type Übergabe!');
+        AlertBox.createBox({
+          type: 'error',
+          position: 'top',
+          animation: 'slideIn',
+          animDuration: 500,
+          text: 'Fehler bei der Type Übergabe!',
+          vanish: true,
+          vanishTimer: 7,
+        });
         break;
     }
 
@@ -158,6 +208,22 @@ export default class App {
 
     // Local Storage einrichten
     this._setLocalStorage();
+
+    // Save Message
+    AlertBox.createBox({
+      type: 'success',
+      position: 'top',
+      animation: 'slideUp',
+      animDuration: 500,
+      text: 'Workout erfolgreich gespeichert!',
+      vanish: true,
+      vanishTimer: 7,
+    });
+
+    // set deleteAll Button
+    if (this.button.classList.contains('delete__button--hidden')) {
+      this._setDeleteButton();
+    }
   }
 
   _createPopup(type) {
